@@ -10,16 +10,16 @@
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
 
-#define  pinDHT11 0
+#define pinDHT22 D0
 #define pinSoil A0
-#define refreshTime 2000 // seconds
-SimpleDHT11 dht11(pinDHT11);
-
+unsigned long lastMsg;
+#define refreshTime 10000 // seconds
+SimpleDHT22 dht22(pinDHT22);
 
 /************************* WiFi Access Point *********************************/
 
-#define WLAN_SSID       "xxx"
-#define WLAN_PASS       "yyy"
+#define WLAN_SSID       "xx"
+#define WLAN_PASS       "yy"
 
 /************************* Adafruit.io Setup *********************************/
 
@@ -54,22 +54,23 @@ Adafruit_MQTT_Publish soil = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/s
 //
 // --- DHT ---
 //
-void dht(byte temp, byte hum) {
-
+void dht(byte *temp, byte *hum) {
+  byte temperature;
+  byte humidity;
+  
   int err = SimpleDHTErrSuccess;
-  if ((err = dht11.read(&temp, &hum, NULL)) != SimpleDHTErrSuccess) {
-    Serial.print("Read DHT11 failed, err="); Serial.println(err); delay(1000);
+  if ((err = dht22.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
+    Serial.print("Read DHT22 failed, err="); Serial.println(err); delay(2000);
     return;
   }
 
-  //  temp = (int)temperature;
-  //  hum = (int)humidity;
+  *temp = temperature;
+  *hum = humidity;
+  
+  Serial.print(temperature); Serial.print(" *C, ");
+  Serial.print(humidity); Serial.println(" H");
 
-  Serial.print((int)temp); Serial.print(" *C, ");
-  Serial.print((int)hum); Serial.println(" H");
 
-  // DHT11 sampling rate is 1HZ.
-  delay(1500);
 }
 
 
@@ -131,7 +132,6 @@ void setup() {
 // --- LOOP ---
 //
 void loop() {
-  char msg[50];
   byte temp = 0;
   byte hum = 0;
   int valSoil = 0;
@@ -141,16 +141,16 @@ void loop() {
   // function definition further below.
   MQTT_connect();
 
-  long lastMsg;
   // reads stuffs
   if (millis() - lastMsg > refreshTime) {
     lastMsg = millis();
 
     // read dht11
-    dht(temp, hum);
+    dht(&temp, &hum);
 
     // read hum soil
     valSoil = analogRead(pinSoil);
+    valSoil = valSoil/4; // for better visibility on scale
     Serial.print("Hub Soil: ");  Serial.println(valSoil);
 
 
