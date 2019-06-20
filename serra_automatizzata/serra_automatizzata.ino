@@ -1,9 +1,9 @@
 /*
- * Serra automatizzata
- * 
- * MakeItModena
- * 
- */
+   Serra automatizzata
+
+   MakeItModena
+
+*/
 #include <PubSubClient.h> // https://github.com/knolleary/pubsubclient
 #include <ESP8266WiFi.h>
 #include <SimpleDHT.h> // https://github.com/winlinvip/SimpleDHT
@@ -12,6 +12,7 @@
 
 #define pinDHT22 D0
 #define pinSoil A0
+#define pinPomp D8
 unsigned long lastMsg;
 #define refreshTime 10000 // seconds
 SimpleDHT22 dht22(pinDHT22);
@@ -47,7 +48,7 @@ Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/
 Adafruit_MQTT_Publish soil = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/soil");
 
 // Setup a feed called 'onoff' for subscribing to changes.
-// Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/onoff");
+Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/pomp");
 
 /***************************************************************************/
 
@@ -57,7 +58,7 @@ Adafruit_MQTT_Publish soil = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/s
 void dht(byte *temp, byte *hum) {
   byte temperature;
   byte humidity;
-  
+
   int err = SimpleDHTErrSuccess;
   if ((err = dht22.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
     Serial.print("Read DHT22 failed, err="); Serial.println(err); delay(2000);
@@ -66,7 +67,7 @@ void dht(byte *temp, byte *hum) {
 
   *temp = temperature;
   *hum = humidity;
-  
+
   Serial.print(temperature); Serial.print(" *C, ");
   Serial.print(humidity); Serial.println(" H");
 
@@ -150,38 +151,44 @@ void loop() {
 
     // read hum soil
     valSoil = analogRead(pinSoil);
-    valSoil = valSoil/4; // for better visibility on scale
+    valSoil = valSoil / 4; // for better visibility on scale
     Serial.print("Hub Soil: ");  Serial.println(valSoil);
+    
+    // start water pomp for a second if valSoil misure is <= x
+    if (valSoil <= soglia_critica)
+      digitalWrite(pinPomp, HIGH); //water pomp on
+    else
+      digitalWrite(pinPomp, LOW); //water pomp off
+    delay(2000); //Attende due secondi
 
-
-    Serial.print(F("\nSending temperature val "));
-    Serial.print(temp);
-    Serial.print("...");
-    if (! temperature.publish(temp)) {
-      Serial.println(F("Failed"));
-    } else {
-      Serial.println(F("OK!"));
-    }
-
-
-    Serial.print(F("\nSending humidity val "));
-    Serial.print(hum);
-    Serial.print("...");
-    if (! humidity.publish(hum)) {
-      Serial.println(F("Failed"));
-    } else {
-      Serial.println(F("OK!"));
-    }
-
-
-    Serial.print(F("\nSending soil val "));
-    Serial.print(valSoil);
-    Serial.print("...");
-    if (! soil.publish(valSoil)) {
-      Serial.println(F("Failed"));
-    } else {
-      Serial.println(F("OK!"));
-    }
-
+  Serial.print(F("\nSending temperature val "));
+  Serial.print(temp);
+  Serial.print("...");
+  if (! temperature.publish(temp)) {
+    Serial.println(F("Failed"));
+  } else {
+    Serial.println(F("OK!"));
   }
+
+
+  Serial.print(F("\nSending humidity val "));
+  Serial.print(hum);
+  Serial.print("...");
+  if (! humidity.publish(hum)) {
+    Serial.println(F("Failed"));
+  } else {
+    Serial.println(F("OK!"));
+  }
+
+
+  Serial.print(F("\nSending soil val "));
+  Serial.print(valSoil);
+  Serial.print("...");
+  if (! soil.publish(valSoil)) {
+    Serial.println(F("Failed"));
+  } else {
+    Serial.println(F("OK!"));
+  }
+
+}
 }
