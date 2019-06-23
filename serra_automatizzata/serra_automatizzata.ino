@@ -15,7 +15,7 @@
 #define pinDHT22 D0
 #define pinSoil A0
 #define pinPomp D3
-#define soglia_critica 10
+#define soglia_critica 300
 unsigned long lastMsg;
 #define refreshTime 5000 // seconds
 SimpleDHT22 dht22(pinDHT22);
@@ -182,12 +182,12 @@ void loop() {
     valSoil = valSoil / 4; // for better visibility on scale
     Serial.print("Hub Soil: ");  Serial.println(valSoil);
 
-    // start water pomp for a second if valSoil misure is <= x
-//    if (valSoil <= soglia_critica) {
-//      digitalWrite(pinPomp, HIGH); //water pomp on
-//      delay(1000); //wait 1 second
-//      digitalWrite(pinPomp, LOW); //water pomp off
-//    }
+    // start water pomp for a second if valSoil humidity is low
+    if (valSoil <= soglia_critica) {
+      digitalWrite(pinPomp, HIGH); //water pomp on
+      delay(1000); //wait 1 second
+      digitalWrite(pinPomp, LOW); //water pomp off
+    }
 //    else
 //      digitalWrite(pinPomp, LOW); //water pomp off
 
