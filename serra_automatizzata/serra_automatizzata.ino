@@ -1,6 +1,8 @@
 /*
    Serra automatizzata
 
+   This program uses Adafruit IO to graph the sensors value.
+
    MakeItModena
 
 */
@@ -12,15 +14,16 @@
 
 #define pinDHT22 D0
 #define pinSoil A0
-#define pinPomp D8
+#define pinPomp D3
+#define soglia_critica 10
 unsigned long lastMsg;
-#define refreshTime 10000 // seconds
+#define refreshTime 5000 // seconds
 SimpleDHT22 dht22(pinDHT22);
 
 /************************* WiFi Access Point *********************************/
 
-#define WLAN_SSID       "xx"
-#define WLAN_PASS       "yy"
+#define WLAN_SSID       "xxx"
+#define WLAN_PASS       "yyy"
 
 /************************* Adafruit.io Setup *********************************/
 
@@ -37,19 +40,15 @@ WiFiClient client;
 //WiFiClientSecure client;
 
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
-Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
+Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_USERNAME, AIO_KEY);
 
 /****************************** Feeds ***************************************/
-
-// Setup a feed called 'photocell' for publishing.
-// Notice MQTT paths for AIO follow the form: <username>/feeds/<feedname>
 Adafruit_MQTT_Publish humidity = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/humidity");
 Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/temperature");
 Adafruit_MQTT_Publish soil = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/soil");
 
 // Setup a feed called 'onoff' for subscribing to changes.
 Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/pomp");
-
 /***************************************************************************/
 
 //
@@ -90,9 +89,9 @@ void MQTT_connect() {
   uint8_t retries = 3;
   while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
     Serial.println(mqtt.connectErrorString(ret));
-    Serial.println("Retrying MQTT connection in 5 seconds...");
+    Serial.println("Retrying MQTT connection in 10 seconds...");
     mqtt.disconnect();
-    delay(5000);  // wait 5 seconds
+    delay(10000);  // wait 10 seconds
     retries--;
     if (retries == 0) {
       // basically die and wait for WDT to reset me
@@ -103,10 +102,30 @@ void MQTT_connect() {
 }
 
 
+void onoffcallback(char *buttonState, uint16_t len) {
+  Serial.print("Button toggle: ");
+  Serial.println(buttonState);
+
+  String buttonstate = buttonState; // to String 
+  String ON = "ON";
+  String OFF = "OFF";
+  
+  if (buttonstate == ON) {
+    Serial.println("ON POMP");
+    digitalWrite(pinPomp, HIGH); //water pomp on
+  }
+  if (buttonstate == OFF) {
+    Serial.println("OFF POMP");
+    digitalWrite(pinPomp, LOW); //water pomp off
+  }
+}
+
+
 //
 // --- SETUP ---
 //
 void setup() {
+  pinMode(pinPomp,OUTPUT);
   Serial.begin(115200);
   delay(10);
 
@@ -126,6 +145,11 @@ void setup() {
 
   Serial.println("WiFi connected");
   Serial.println("IP address: "); Serial.println(WiFi.localIP());
+
+  onoffbutton.setCallback(onoffcallback);
+
+  // Setup MQTT subscription for time feed.
+  mqtt.subscribe(&onoffbutton);
 }
 
 
@@ -142,6 +166,10 @@ void loop() {
   // function definition further below.
   MQTT_connect();
 
+  // this is our 'wait for incoming subscription packets and callback em' busy subloop
+  // try to spend your time here:
+  mqtt.processPackets(10000);
+
   // reads stuffs
   if (millis() - lastMsg > refreshTime) {
     lastMsg = millis();
@@ -153,43 +181,49 @@ void loop() {
     valSoil = analogRead(pinSoil);
     valSoil = valSoil / 4; // for better visibility on scale
     Serial.print("Hub Soil: ");  Serial.println(valSoil);
-    
+
     // start water pomp for a second if valSoil misure is <= x
-    if (valSoil <= soglia_critica)
-      digitalWrite(pinPomp, HIGH); //water pomp on
-      delay(1000); //wait 1 second
-      digitalWrite(pinPomp, LOW); //water pomp off
-    else
-      digitalWrite(pinPomp, LOW); //water pomp off
+//    if (valSoil <= soglia_critica) {
+//      digitalWrite(pinPomp, HIGH); //water pomp on
+//      delay(1000); //wait 1 second
+//      digitalWrite(pinPomp, LOW); //water pomp off
+//    }
+//    else
+//      digitalWrite(pinPomp, LOW); //water pomp off
 
-  Serial.print(F("\nSending temperature val "));
-  Serial.print(temp);
-  Serial.print("...");
-  if (! temperature.publish(temp)) {
-    Serial.println(F("Failed"));
-  } else {
-    Serial.println(F("OK!"));
+    Serial.print(F("\nSending temperature val "));
+    Serial.print(temp);
+    Serial.print("...");
+    if (! temperature.publish(temp)) {
+      Serial.println(F("Failed"));
+    } else {
+      Serial.println(F("OK!"));
+    }
+
+
+    Serial.print(F("\nSending humidity val "));
+    Serial.print(hum);
+    Serial.print("...");
+    if (! humidity.publish(hum)) {
+      Serial.println(F("Failed"));
+    } else {
+      Serial.println(F("OK!"));
+    }
+
+
+    Serial.print(F("\nSending soil val "));
+    Serial.print(valSoil);
+    Serial.print("...");
+    if (! soil.publish(valSoil)) {
+      Serial.println(F("Failed"));
+    } else {
+      Serial.println(F("OK!"));
+    }
+    Serial.println("--------------------------------");
+
   }
 
-
-  Serial.print(F("\nSending humidity val "));
-  Serial.print(hum);
-  Serial.print("...");
-  if (! humidity.publish(hum)) {
-    Serial.println(F("Failed"));
-  } else {
-    Serial.println(F("OK!"));
+  if (! mqtt.ping()) {
+    mqtt.disconnect();
   }
-
-
-  Serial.print(F("\nSending soil val "));
-  Serial.print(valSoil);
-  Serial.print("...");
-  if (! soil.publish(valSoil)) {
-    Serial.println(F("Failed"));
-  } else {
-    Serial.println(F("OK!"));
-  }
-
-}
 }
