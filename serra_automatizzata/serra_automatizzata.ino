@@ -15,7 +15,7 @@
 #define pinDHT22 D0
 #define pinSoil A0
 #define pinPomp D3
-#define soglia_critica 10
+#define soglia_critica 200
 unsigned long lastMsg;
 #define refreshTime 5000 // seconds
 SimpleDHT22 dht22(pinDHT22);
@@ -69,8 +69,6 @@ void dht(byte *temp, byte *hum) {
 
   Serial.print(temperature); Serial.print(" *C, ");
   Serial.print(humidity); Serial.println(" H");
-
-
 }
 
 
@@ -106,10 +104,10 @@ void onoffcallback(char *buttonState, uint16_t len) {
   Serial.print("Button toggle: ");
   Serial.println(buttonState);
 
-  String buttonstate = buttonState; // to String 
+  String buttonstate = buttonState; // to String
   String ON = "ON";
   String OFF = "OFF";
-  
+
   if (buttonstate == ON) {
     Serial.println("ON POMP");
     digitalWrite(pinPomp, HIGH); //water pomp on
@@ -125,7 +123,8 @@ void onoffcallback(char *buttonState, uint16_t len) {
 // --- SETUP ---
 //
 void setup() {
-  pinMode(pinPomp,OUTPUT);
+  pinMode(pinPomp, OUTPUT);
+  digitalWrite(pinPomp, LOW);
   Serial.begin(115200);
   delay(10);
 
@@ -183,13 +182,12 @@ void loop() {
     Serial.print("Hub Soil: ");  Serial.println(valSoil);
 
     // start water pomp for a second if valSoil misure is <= x
-//    if (valSoil <= soglia_critica) {
-//      digitalWrite(pinPomp, HIGH); //water pomp on
-//      delay(1000); //wait 1 second
-//      digitalWrite(pinPomp, LOW); //water pomp off
-//    }
-//    else
-//      digitalWrite(pinPomp, LOW); //water pomp off
+    if (valSoil >= soglia_critica) {
+      digitalWrite(pinPomp, HIGH); //water pomp on
+      delay(1000); //wait 1 second
+      digitalWrite(pinPomp, LOW); //water pomp off
+    }
+
 
     Serial.print(F("\nSending temperature val "));
     Serial.print(temp);
