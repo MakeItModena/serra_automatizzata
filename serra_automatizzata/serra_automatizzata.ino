@@ -16,6 +16,7 @@
 #define pinSoil A0
 #define pinPomp D3
 #define soglia_critica 200
+
 unsigned long lastMsg;
 #define refreshTime 5000 // seconds
 SimpleDHT22 dht22(pinDHT22);
@@ -183,11 +184,11 @@ void loop() {
 
     // start water pomp for a second if valSoil misure is <= x
     if (valSoil >= soglia_critica) {
+
       digitalWrite(pinPomp, HIGH); //water pomp on
       delay(1000); //wait 1 second
       digitalWrite(pinPomp, LOW); //water pomp off
     }
-
 
     Serial.print(F("\nSending temperature val "));
     Serial.print(temp);
