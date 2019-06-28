@@ -19,3 +19,5 @@ Remember to change the following parts:
 ```
 
 ![schematic](schematic_bb.jpg)  
+
+![adafruit_screenshot_dashboard](Screenshot-20190628164440-1667x944.png)
